@@ -1,5 +1,5 @@
 #include <expected>
-#include <print>
+#include <iostream>
 #include <string_view>
 
 #define PARSE_ERRORS(MACRO)                      \
@@ -18,15 +18,15 @@ enum struct birthdate_error
 #undef XXX
 };
 
-static constexpr std::string_view to_string(birthdate_error e)
+static std::ostream& operator<<(std::ostream& os, birthdate_error e) noexcept
 {
     switch (e) {
 #define XXX(name, info) \
-    case birthdate_error::name: return info;
+    case birthdate_error::name: return os << info;
         PARSE_ERRORS(XXX)
 #undef XXX
     }
-    return "unknown parse error";
+    return os << "unknown parse error";
 };
 
 #undef PARSE_ERRORS
@@ -103,6 +103,11 @@ private:
     }
 };
 
+static std::ostream& operator<<(std::ostream& os, birthdate d) noexcept
+{
+    return os << d.year() << '-' << d.month() << '-' << d.day();
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 int main()
@@ -110,11 +115,11 @@ int main()
     using namespace std::string_view_literals;
     for (auto date : {"2026-04-17"sv, "2026-02-29"sv}) {
         if (const auto res = birthdate::parse(date); res) {
-            std::println("Parse succeeded. Input: {}. Date: {:04}-{:02}-{:02}.",
-                         date, res->year(), res->month(), res->day());
+            std::cout << "Parse succeeded. Input: " << date
+                      << ". Date: " << res.value();
         } else {
-            std::println("Parse failed. Input: {}. Error: {}.", date,
-                         to_string(res.error()));
+            std::cout << "Parse succeeded. Input: " << date
+                      << ". Error: " << res.error();
         }
     }
     return 0;

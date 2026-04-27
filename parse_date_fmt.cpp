@@ -1,6 +1,7 @@
 #include <expected>
-#include <iostream>
 #include <string_view>
+
+#include "fmt/format.h"
 
 #define PARSE_ERRORS(MACRO)                      \
     MACRO(bad_format, "expected YYYY-MM-DD")     \
@@ -18,15 +19,22 @@ enum struct birthdate_error
 #undef XXX
 };
 
-static constexpr std::string_view to_string(birthdate_error e)
+template <>
+struct fmt::formatter<birthdate_error> : fmt::formatter<std::string_view>
 {
-    switch (e) {
+    auto format(const birthdate_error& arg, auto& ctx) const noexcept
+    {
+        auto to_string = [](birthdate_error e) static -> std::string_view {
+            switch (e) {
 #define XXX(name, info) \
     case birthdate_error::name: return info;
-        PARSE_ERRORS(XXX)
+                PARSE_ERRORS(XXX)
 #undef XXX
+            }
+            return "unknown parse error";
+        };
+        return fmt::formatter<std::string_view>::format(to_string(arg), ctx);
     }
-    return "unknown parse error";
 };
 
 #undef PARSE_ERRORS
@@ -103,6 +111,19 @@ private:
     }
 };
 
+template <>
+struct fmt::formatter<birthdate> : fmt::formatter<std::string_view>
+{
+    auto format(const birthdate& arg, auto& ctx) const noexcept
+    {
+        char buf[10];
+        auto [end, _] = fmt::format_to_n(buf, sizeof(buf), "{:04}-{:02}-{:02}",
+                                         arg.year(), arg.month(), arg.day());
+        using base_type = fmt::formatter<std::string_view>;
+        return base_type::format(std::string_view(buf, end - buf), ctx);
+    }
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 
 int main()
@@ -110,12 +131,11 @@ int main()
     using namespace std::string_view_literals;
     for (auto date : {"2026-04-17"sv, "2026-02-29"sv}) {
         if (const auto res = birthdate::parse(date); res) {
-            std::cout << "Parse succeeded. Input: " << date
-                      << ". Date: " << res->year() << '-' << res->month() << '-'
-                      << res->day();
+            fmt::println("Parse succeded. Input: {}. Date: {}.", date,
+                         res.value());
         } else {
-            std::cout << "Parse succeeded. Input: " << date
-                      << ". Error: " << to_string(res.error());
+            fmt::println("Parse failed. Input: {}. Error: {}.", date,
+                         res.error());
         }
     }
     return 0;
